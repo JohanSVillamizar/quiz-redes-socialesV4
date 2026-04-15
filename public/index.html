@@ -603,6 +603,7 @@ function renderVoteTally(msg) {
 // ─── SORT (drag & drop — sin cambios, un miembro controla) ────────────────────
 function renderSort(r) {
   document.getElementById("sort-wrap").classList.remove("hidden");
+  document.getElementById("sort-submit").disabled = false;
   sortOrder = r.items.map((text, i) => ({ idx: i, text })).sort(() => Math.random() - .5);
   renderSortList();
 }
@@ -921,7 +922,7 @@ function renderReveal(msg) {
   // Helper: muestra el banner de estado del equipo
   function setStatus(variant, text) {
     statusEl.className = `rv-status ${variant}`;
-    if ((variant === "bad" || variant === "partial") && mySubmission?.earned !== undefined) {
+    if (mySubmission?.earned !== undefined) {
       const pts = mySubmission.earned;
       const ptsLine = pts > 0
         ? `En esta ronda tu equipo ganó <strong>${pts} puntos</strong>`
