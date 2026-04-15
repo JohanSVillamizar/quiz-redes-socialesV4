@@ -255,12 +255,18 @@ body{
 
 /* ── REVEAL ── */
 #reveal-view{ padding-top:12px; }
-.rv-wrong{
-  color:var(--orange); font-size:14px; font-weight:700; margin-bottom:6px; line-height:1.5;
-  background:rgba(255,107,53,.1); border-left:3px solid var(--orange);
-  border-radius:0 8px 8px 0; padding:8px 12px;
+.rv-status{
+  font-size:14px; font-weight:700; margin-bottom:8px; line-height:1.5;
+  border-radius:0 8px 8px 0; padding:8px 12px; border-left:3px solid;
 }
-.rv-correct{ color:var(--teal); font-size:16px; font-weight:700; margin-bottom:10px; line-height:1.5; }
+.rv-status.ok     { color:var(--teal);   background:rgba(0,201,177,.1);    border-color:var(--teal); }
+.rv-status.partial{ color:var(--yellow); background:rgba(255,209,102,.08); border-color:var(--yellow); }
+.rv-status.bad    { color:var(--orange); background:rgba(255,107,53,.1);   border-color:var(--orange); }
+.rv-correct{ font-size:14px; font-weight:700; margin-bottom:10px; line-height:1.7; color:var(--white); }
+.rv-pair{ display:flex; align-items:baseline; gap:6px; margin-bottom:4px; font-size:13px; }
+.rv-pair.ok  { color:var(--teal); }
+.rv-pair.bad { color:var(--orange); }
+.rv-pair .rv-wrong-ans{ color:var(--gray); font-size:12px; font-weight:400; }
 .rv-expl{
   background:var(--mid); border-radius:11px; padding:14px; font-size:13px;
   line-height:1.7; color:#d0f5f0; margin-bottom:16px;
@@ -401,7 +407,7 @@ body{
 
 <!-- ═══════════════════════════════════ REVEAL ══════════════════════════════ -->
 <div id="reveal-view" class="screen hidden">
-  <div class="rv-wrong hidden" id="rv-wrong"></div>
+  <div class="rv-status hidden" id="rv-status"></div>
   <div class="rv-correct" id="rv-correct"></div>
   <div class="rv-expl" id="rv-expl"></div>
   <div class="sb-title">📊 Marcador actual</div>
@@ -908,32 +914,73 @@ function renderFeedback(msg) {
 function renderReveal(msg) {
   show("reveal-view");
   const r = msg.round;
-  let correctMsg = "";
+  const mySubmission = msg.submissions?.[myTeamId];
+  const statusEl = document.getElementById("rv-status");
+  const correctEl = document.getElementById("rv-correct");
+
+  // Helper: muestra el banner de estado del equipo
+  function setStatus(variant, text) {
+    statusEl.textContent = text;
+    statusEl.className = `rv-status ${variant}`;
+  }
 
   if (r.type === "mcq" || r.type === "vote") {
     const L = ["A","B","C","D"];
-    correctMsg = `✔ Respuesta correcta: ${L[r.correct]} — ${r.options[r.correct]}`;
+    correctEl.textContent = `✔ Respuesta correcta: ${L[r.correct]} — ${r.options[r.correct]}`;
+    if (mySubmission?.correct) {
+      setStatus("ok", "✓ ¡Tu equipo respondió correctamente!");
+    } else if (mySubmission) {
+      const chosen = mySubmission.answer;
+      setStatus("bad", `✗ Tu equipo respondió: ${L[chosen]} — ${r.options[chosen]}`);
+    }
+
   } else if (r.type === "sort") {
-    correctMsg = `✔ Orden correcto: ${r.correctOrder.map((i, p) => `${p+1}. ${r.items[i]}`).join(" → ")}`;
+    correctEl.textContent = `✔ Orden correcto: ${r.correctOrder.map((i, p) => `${p+1}. ${r.items[i]}`).join(" → ")}`;
+    if (mySubmission?.correct) {
+      setStatus("ok", "✓ ¡Tu equipo ordenó correctamente!");
+    } else if (mySubmission) {
+      setStatus("bad", "✗ Tu equipo no ordenó correctamente");
+    }
+
   } else if (r.type === "match") {
-    correctMsg = `✔ Pares correctos:\n${r.pairs.map(p => `${p.left} ↔ ${p.right}`).join("\n")}`;
+    const answer = mySubmission?.answer || {};
+    // Construir lista de pares con indicador de correcto/incorrecto
+    correctEl.innerHTML = r.pairs.map((p, i) => {
+      const connected = answer[String(i)];
+      const isCorrect = parseInt(connected) === i;
+      const noAnswer  = connected === undefined;
+      if (noAnswer) {
+        return `<div class="rv-pair bad">— ${p.left} <span class="rv-wrong-ans">(sin conectar)</span></div>`;
+      }
+      const chosenRight = r.pairs[parseInt(connected)]?.right ?? "?";
+      return `<div class="rv-pair ${isCorrect ? "ok" : "bad"}">
+        ${isCorrect ? "✔" : "✗"} ${p.left} ↔ ${isCorrect ? p.right : `<span class="rv-wrong-ans">${chosenRight} (correcto: ${p.right})</span>`}
+      </div>`;
+    }).join("");
+    const correctCount = r.pairs.filter((_, i) => parseInt(answer[String(i)]) === i).length;
+    const total = r.pairs.length;
+    if (correctCount === total) {
+      setStatus("ok", `✓ ¡Tu equipo conectó los ${total} pares correctamente!`);
+    } else if (correctCount > 0) {
+      setStatus("partial", `Tu equipo conectó ${correctCount} de ${total} pares correctamente`);
+    } else {
+      setStatus("bad", "✗ Tu equipo no conectó ningún par correctamente");
+    }
+
   } else if (r.type === "strategy") {
-    correctMsg = `✔ Estrategia óptima:\n${r.blocks.map(b => `${b.label}: ${b.options[b.correct]}`).join("\n")}`;
+    correctEl.textContent = `✔ Estrategia óptima:\n${r.blocks.map(b => `${b.label}: ${b.options[b.correct]}`).join("\n")}`;
+    const answer = mySubmission?.answer ?? [];
+    const correctCount = r.blocks.filter((b, i) => answer[i] === b.correct).length;
+    const total = r.blocks.length;
+    if (correctCount === total) {
+      setStatus("ok", `✓ ¡Tu equipo eligió todos los bloques correctamente!`);
+    } else if (correctCount > 0) {
+      setStatus("partial", `Tu equipo acertó ${correctCount} de ${total} bloques`);
+    } else {
+      setStatus("bad", "✗ Tu equipo no acertó ningún bloque");
+    }
   }
 
-  // Mostrar la respuesta incorrecta del equipo (solo en MCQ y vote)
-  const wrongEl = document.getElementById("rv-wrong");
-  const mySubmission = msg.submissions?.[myTeamId];
-  if ((r.type === "mcq" || r.type === "vote") && mySubmission && !mySubmission.correct) {
-    const L = ["A","B","C","D"];
-    const chosen = mySubmission.answer;
-    wrongEl.textContent = `✗ Tu equipo respondió: ${L[chosen]} — ${r.options[chosen]}`;
-    wrongEl.classList.remove("hidden");
-  } else {
-    wrongEl.classList.add("hidden");
-  }
-
-  document.getElementById("rv-correct").textContent = correctMsg;
   document.getElementById("rv-expl").textContent = "💡 " + msg.explanation;
   document.getElementById("rv-sb").innerHTML = msg.scoreboard.map(t => `
     <div class="sbr ${t.name === myTeamName ? "me" : ""}">
