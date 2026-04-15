@@ -255,6 +255,11 @@ body{
 
 /* ── REVEAL ── */
 #reveal-view{ padding-top:12px; }
+.rv-wrong{
+  color:var(--orange); font-size:14px; font-weight:700; margin-bottom:6px; line-height:1.5;
+  background:rgba(255,107,53,.1); border-left:3px solid var(--orange);
+  border-radius:0 8px 8px 0; padding:8px 12px;
+}
 .rv-correct{ color:var(--teal); font-size:16px; font-weight:700; margin-bottom:10px; line-height:1.5; }
 .rv-expl{
   background:var(--mid); border-radius:11px; padding:14px; font-size:13px;
@@ -396,6 +401,7 @@ body{
 
 <!-- ═══════════════════════════════════ REVEAL ══════════════════════════════ -->
 <div id="reveal-view" class="screen hidden">
+  <div class="rv-wrong hidden" id="rv-wrong"></div>
   <div class="rv-correct" id="rv-correct"></div>
   <div class="rv-expl" id="rv-expl"></div>
   <div class="sb-title">📊 Marcador actual</div>
@@ -913,6 +919,18 @@ function renderReveal(msg) {
     correctMsg = `✔ Pares correctos:\n${r.pairs.map(p => `${p.left} ↔ ${p.right}`).join("\n")}`;
   } else if (r.type === "strategy") {
     correctMsg = `✔ Estrategia óptima:\n${r.blocks.map(b => `${b.label}: ${b.options[b.correct]}`).join("\n")}`;
+  }
+
+  // Mostrar la respuesta incorrecta del equipo (solo en MCQ y vote)
+  const wrongEl = document.getElementById("rv-wrong");
+  const mySubmission = msg.submissions?.[myTeamId];
+  if ((r.type === "mcq" || r.type === "vote") && mySubmission && !mySubmission.correct) {
+    const L = ["A","B","C","D"];
+    const chosen = mySubmission.answer;
+    wrongEl.textContent = `✗ Tu equipo respondió: ${L[chosen]} — ${r.options[chosen]}`;
+    wrongEl.classList.remove("hidden");
+  } else {
+    wrongEl.classList.add("hidden");
   }
 
   document.getElementById("rv-correct").textContent = correctMsg;

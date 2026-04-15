@@ -448,34 +448,47 @@ function buildCollabSnapshot(teamId, round) {
 
   if (round.type === "match") {
     const totalPairs = round.pairs.length;
-    // Repartimos los pares equitativamente en orden:
-    // miembro 0 → pares 0..k-1, miembro 1 → pares k..2k-1, etc.
-    // Usamos el índice dentro del equipo para asignar
-    const perMember = Math.ceil(totalPairs / n);
     const assignments = {}; // memberName → [leftIdx, ...]
-    memberNames.forEach((name, mi) => {
-      assignments[name] = [];
-      for (let p = mi * perMember; p < Math.min((mi + 1) * perMember, totalPairs); p++) {
-        assignments[name].push(p);
-      }
-    });
+    if (n >= totalPairs) {
+      // Más miembros que pares: asignación cíclica, cada miembro recibe 1 par.
+      // Varios miembros pueden compartir un par; el primero en conectarlo lo bloquea.
+      memberNames.forEach((name, mi) => {
+        assignments[name] = [mi % totalPairs];
+      });
+    } else {
+      // Más pares que miembros: distribución equitativa en bloques.
+      const perMember = Math.ceil(totalPairs / n);
+      memberNames.forEach((name, mi) => {
+        assignments[name] = [];
+        for (let p = mi * perMember; p < Math.min((mi + 1) * perMember, totalPairs); p++) {
+          assignments[name].push(p);
+        }
+      });
+    }
     return {
       connections: ws.connections,
       lockedBy: ws.lockedBy,
-      assignments, // cada miembro sabe qué pares son "suyos"
+      assignments,
     };
   }
 
   if (round.type === "strategy") {
     const totalBlocks = round.blocks.length;
-    const perMember = Math.ceil(totalBlocks / n);
     const assignments = {};
-    memberNames.forEach((name, mi) => {
-      assignments[name] = [];
-      for (let b = mi * perMember; b < Math.min((mi + 1) * perMember, totalBlocks); b++) {
-        assignments[name].push(b);
-      }
-    });
+    if (n >= totalBlocks) {
+      // Más miembros que bloques: asignación cíclica.
+      memberNames.forEach((name, mi) => {
+        assignments[name] = [mi % totalBlocks];
+      });
+    } else {
+      const perMember = Math.ceil(totalBlocks / n);
+      memberNames.forEach((name, mi) => {
+        assignments[name] = [];
+        for (let b = mi * perMember; b < Math.min((mi + 1) * perMember, totalBlocks); b++) {
+          assignments[name].push(b);
+        }
+      });
+    }
     return {
       selections: ws.selections,
       blockOwner: ws.blockOwner,
