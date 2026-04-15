@@ -440,6 +440,13 @@ function send(d) { ws.send(JSON.stringify(d)); }
 
 // ─── MANEJADOR CENTRAL DE MENSAJES ───────────────────────────────────────────
 function handle(msg) {
+  // Interceptar "equipo no encontrado" al intentar unirse: crear el equipo
+  if (msg.type === "error" && msg.message.includes("no encontrado") && _pendingJoin) {
+    const { teamName, memberName } = _pendingJoin;
+    _pendingJoin = null;
+    send({ type: "join_team", name: teamName, memberName });
+    return;
+  }
   switch (msg.type) {
     case "error":          showErr(msg.message); break;
     case "team_created":   onJoined(msg.teamId, msg.teamName, msg.memberId, msg.memberName); break;
@@ -495,17 +502,6 @@ function joinTeam() {
   send({ type: "join_member", teamName: selectedTeamName, memberName: mname });
 }
 
-// Sobreponemos handle para interceptar "equipo no encontrado"
-const _baseHandle = handle;
-function handle(msg) {
-  if (msg.type === "error" && msg.message.includes("no encontrado") && _pendingJoin) {
-    const { teamName, memberName } = _pendingJoin;
-    _pendingJoin = null;
-    send({ type: "join_team", name: teamName, memberName });
-    return;
-  }
-  _baseHandle(msg);
-}
 
 function onJoined(tid, tname, mid, mname) {
   myTeamId = tid; myTeamName = tname; myMemberId = mid; myMemberName = mname;
