@@ -920,8 +920,16 @@ function renderReveal(msg) {
 
   // Helper: muestra el banner de estado del equipo
   function setStatus(variant, text) {
-    statusEl.textContent = text;
     statusEl.className = `rv-status ${variant}`;
+    if ((variant === "bad" || variant === "partial") && mySubmission?.earned !== undefined) {
+      const pts = mySubmission.earned;
+      const ptsLine = pts > 0
+        ? `En esta ronda tu equipo ganó <strong>${pts} puntos</strong>`
+        : `En esta ronda tu equipo no ganó puntos`;
+      statusEl.innerHTML = `${text}<br><span style="font-weight:400;font-size:12px;opacity:.85">${ptsLine}</span>`;
+    } else {
+      statusEl.textContent = text;
+    }
   }
 
   if (r.type === "mcq" || r.type === "vote") {
